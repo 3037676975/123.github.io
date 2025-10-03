@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片URL转换工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#6366F1',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .transition-height {
+                transition: max-height 0.3s ease-in-out;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .bg-gradient {
+                background: linear-gradient(135deg, #3B82F6 0%, #6366F1 100%);
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-neutral min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-md sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-image text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-neutral">图片URL转换工具</h1>
+            </div>
+            <div class="hidden md:flex items-center space-x-6">
+                <a href="#" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle mr-1"></i>使用帮助
+                </a>
+                <a href="#" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-history mr-1"></i>历史记录
+                </a>
+            </div>
+            <button class="md:hidden text-gray-600" id="mobileMenuBtn">
+                <i class="fa fa-bars text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- 移动端菜单 -->
+        <div id="mobileMenu" class="md:hidden hidden bg-white border-t">
+            <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+                <a href="#" class="py-2 text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle mr-2"></i>使用帮助
+                </a>
+                <a href="#" class="py-2 text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-history mr-2"></i>历史记录
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 介绍卡片 -->
+        <div class="bg-gradient rounded-xl shadow-lg p-6 mb-8 text-white transform hover:scale-[1.01] transition-transform">
+            <h2 class="text-2xl font-bold mb-3 text-shadow">轻松转换图片URL为IMG标签</h2>
+            <p class="opacity-90">支持单个URL转换、批量URL转换（每行一个），可一键复制结果或导出为Excel表格</p>
+        </div>
+        
+        <!-- 输入区域 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8 transform transition-all duration-300 hover:shadow-lg">
+            <div class="mb-4">
+                <label for="urlInput" class="block text-gray-700 font-medium mb-2">请输入图片URL（单个或多个，每行一个）：</label>
+                <textarea 
+                    id="urlInput" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none"
+                    rows="6" 
+                    placeholder="例如：https://i0.hdslb.com/bfs/openplatform/221de231eb76a4fcb2b94d9d413c5bb6e70d2122.png&#10;可在此处输入多个URL，每行一个"></textarea>
+            </div>
+            
+            <div class="flex flex-wrap gap-4 justify-center">
+                <button 
+                    id="convertBtn" 
+                    class="bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-lg transition-all flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                >
+                    <i class="fa fa-magic mr-2"></i>一键转换
+                </button>
+                <button 
+                    id="clearBtn" 
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium px-6 py-3 rounded-lg transition-all flex items-center shadow-sm hover:shadow"
+                >
+                    <i class="fa fa-trash mr-2"></i>清空输入
+                </button>
+            </div>
+        </div>
+        
+        <!-- 结果区域 -->
+        <div id="resultSection" class="hidden bg-white rounded-xl shadow-md p-6 transform transition-all duration-300 hover:shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-700">转换结果</h3>
+                <div class="text-sm text-gray-500" id="resultCount">共 0 条结果</div>
+            </div>
+            
+            <div class="mb-4 border border-gray-200 rounded-lg overflow-hidden">
+                <div id="resultContainer" class="max-h-96 overflow-y-auto p-4 space-y-3">
+                    <!-- 结果将在这里显示 -->
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-4 justify-center">
+                <button 
+                    id="copyAllBtn" 
+                    class="bg-secondary hover:bg-secondary/90 text-white font-medium px-6 py-3 rounded-lg transition-all flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                >
+                    <i class="fa fa-copy mr-2"></i>复制全部结果
+                </button>
+                <button 
+                    id="exportExcelBtn" 
+                    class="bg-accent hover:bg-accent/90 text-white font-medium px-6 py-3 rounded-lg transition-all flex items-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                >
+                    <i class="fa fa-file-excel-o mr-2"></i>导出Excel
+                </button>
+            </div>
+        </div>
+        
+        <!-- 使用说明 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mt-8">
+            <h3 class="text-xl font-bold text-gray-700 mb-4">使用说明</h3>
+            <div class="space-y-3 text-gray-600">
+                <div class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+                    <p>在输入框中输入图片URL，单个URL或多个URL（每行一个）均可</p>
+                </div>
+                <div class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+                    <p>点击"一键转换"按钮，系统将自动生成完整的IMG标签</p>
+                </div>
+                <div class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+                    <p>可点击每条结果后的"复制"按钮复制单个标签，或点击"复制全部结果"复制所有标签</p>
+                </div>
+                <div class="flex items-start">
+                    <i class="fa fa-check-circle text-secondary mt-1 mr-3"></i>
+                    <p>点击"导出Excel"按钮可将转换前后的内容导出为Excel表格，方便保存和使用</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-neutral text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa fa-image text-primary text-xl"></i>
+                        <span class="font-bold">图片URL转换工具</span>
+                    </div>
+                    <p class="text-gray-400 text-sm mt-2">高效、便捷的图片URL处理工具</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-github text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-envelope text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400 text-sm">
+                &copy; 2023 图片URL转换工具 | 设计与开发
+            </div>
+        </div>
+    </footer>
+
+    <!-- 通知提示框 -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-neutral text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center">
+        <i id="toastIcon" class="fa mr-2"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script>
+        // DOM元素
+        const urlInput = document.getElementById('urlInput');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const resultSection = document.getElementById('resultSection');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultCount = document.getElementById('resultCount');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const toast = document.getElementById('toast');
+        const toastIcon = document.getElementById('toastIcon');
+        const toastMessage = document.getElementById('toastMessage');
+        
+        // 存储转换结果
+        let conversionResults = [];
+        
+        // 移动端菜单切换
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // 显示通知提示
+        function showToast(message, isSuccess = true) {
+            toastMessage.textContent = message;
+            toastIcon.className = isSuccess ? 'fa fa-check-circle mr-2' : 'fa fa-exclamation-circle mr-2';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+        
+        // 验证URL是否有效
+        function isValidUrl(url) {
+            try {
+                new URL(url);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // 转换URL为IMG标签
+        function convertUrlToImgTag(url) {
+            // 移除首尾空格
+            url = url.trim();
+            if (!url) return '';
+            
+            // 检查URL是否有效
+            if (!isValidUrl(url)) {
+                return null; // 无效URL
+            }
+            
+            // 检查URL是否已包含转换前缀
+            const prefix = 'https://images.weserv.nl/?url=';
+            const processedUrl = url.startsWith(prefix) ? url : prefix + url;
+            
+            return `<img src="${processedUrl}" alt="image">`;
+        }
+        
+        // 处理转换
+        convertBtn.addEventListener('click', () => {
+            const input = urlInput.value.trim();
+            if (!input) {
+                showToast('请输入图片URL', false);
+                return;
+            }
+            
+            // 清空之前的结果
+            resultContainer.innerHTML = '';
+            conversionResults = [];
+            
+            // 按行分割URL
+            const urls = input.split('\n').filter(url => url.trim() !== '');
+            let validCount = 0;
+            
+            // 转换每个URL并显示结果
+            urls.forEach((url, index) => {
+                const imgTag = convertUrlToImgTag(url);
+                
+                // 创建结果元素
+                const resultItem = document.createElement('div');
+                resultItem.className = 'p-3 rounded-lg border flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-gray-100 transition-colors opacity-0';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'flex-grow break-all mb-2 md:mb-0';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm transition-colors flex items-center';
+                copyBtn.innerHTML = '<i class="fa fa-copy mr-1"></i> 复制';
+                
+                if (imgTag) {
+                    // 有效URL处理
+                    validCount++;
+                    conversionResults.push({
+                        originalUrl: url,
+                        imgTag: imgTag
+                    });
+                    
+                    contentDiv.textContent = imgTag;
+                    resultItem.classList.add('bg-gray-50', 'border-gray-200');
+                    
+                    // 单个复制功能
+                    copyBtn.addEventListener('click', () => {
+                        navigator.clipboard.writeText(imgTag)
+                            .then(() => showToast('已复制到剪贴板'))
+                            .catch(() => showToast('复制失败，请手动复制', false));
+                    });
+                } else {
+                    // 无效URL处理
+                    contentDiv.innerHTML = `<span class="text-red-500">无效的URL: ${url}</span>`;
+                    resultItem.classList.add('bg-red-50', 'border-red-200');
+                    copyBtn.disabled = true;
+                    copyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                
+                resultItem.appendChild(contentDiv);
+                resultItem.appendChild(copyBtn);
+                resultContainer.appendChild(resultItem);
+                
+                // 添加淡入动画
+                setTimeout(() => {
+                    resultItem.classList.add('opacity-100');
+                }, 50 * index);
+            });
+            
+            // 更新结果计数并显示结果区域
+            resultCount.textContent = `共 ${conversionResults.length} 条有效结果 (总输入: ${urls.length})`;
+            resultSection.classList.remove('hidden');
+            
+            // 平滑滚动到结果区域
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            showToast(`转换完成，共处理 ${urls.length} 个URL，其中 ${validCount} 个有效`);
+        });
+        
+        // 清空输入
+        clearBtn.addEventListener('click', () => {
+            urlInput.value = '';
+            urlInput.focus();
+            showToast('已清空输入');
+        });
+        
+        // 复制全部结果 - 修复后的版本
+        copyAllBtn.addEventListener('click', () => {
+            if (conversionResults.length === 0) {
+                showToast('没有可复制的结果', false);
+                return;
+            }
+            
+            try {
+                // 收集所有有效的img标签
+                const allTags = conversionResults.map(item => item.imgTag);
+                
+                // 使用TextArea确保换行符正确处理
+                const textarea = document.createElement('textarea');
+                textarea.value = allTags.join('\n');
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                showToast(`已成功复制 ${conversionResults.length} 条结果到剪贴板`);
+            } catch (error) {
+                console.error('复制失败:', error);
+                showToast('复制失败，请手动复制', false);
+            }
+        });
+        
+        // 导出Excel
+        exportExcelBtn.addEventListener('click', () => {
+            if (conversionResults.length === 0) {
+                showToast('没有可导出的结果', false);
+                return;
+            }
+            
+            // 准备Excel数据
+            const wsData = [
+                ['原始URL', '转换后的IMG标签'], // 表头
+                ...conversionResults.map(item => [item.originalUrl, item.imgTag])
+            ];
+            
+            // 创建工作簿和工作表
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            
+            // 调整列宽
+            const wscols = [
+                {wch: 60}, // 原始URL列宽
+                {wch: 80}  // 转换后的IMG标签列宽
+            ];
+            ws['!cols'] = wscols;
+            
+            // 创建工作簿并添加工作表
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '图片URL转换结果');
+            
+            // 生成并下载Excel文件
+            const fileName = `图片URL转换结果_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showToast(`Excel文件已导出: ${fileName}`);
+        });
+        
+        // 页面滚动时改变导航栏样式
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 10) {
+                header.classList.add('py-2');
+                header.classList.remove('py-4');
+            } else {
+                header.classList.add('py-4');
+                header.classList.remove('py-2');
+            }
+        });
+        
+        // 初始化 - 聚焦到输入框
+        urlInput.focus();
+    </script>
+</body>
+</html>
